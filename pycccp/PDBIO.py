@@ -12,6 +12,8 @@
 #   You should have received a copy of the GNU General Public License along 
 #   with this program. If not, see <http://www.gnu.org/licenses/>
 
+import numpy as np
+
 from Bio.PDB.PDBIO import PDBIO
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
