@@ -147,7 +147,7 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     if np.dot(v[:, 2], M[chL] - M[0]) < 0:
         v *= -1. # ensure Z is approximately parallel to the first helix
     M = np.dot(M, v) # rotate bundle into principal component (PC) frame
-    structure.transform(v, -M0bar) # transform full reference structure
+    structure.transform(v, -np.dot(M0bar, v)) # transform reference structure
     dist = np.zeros(cN) # centroid distances to the Z-axis
     centroid_0 = M[:chL].mean(axis=0)
     dist[0] = np.sqrt(centroid_0[0] ** 2 + centroid_0[1] ** 2)
