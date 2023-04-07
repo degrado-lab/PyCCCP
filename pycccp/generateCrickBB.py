@@ -18,7 +18,7 @@ import numpy as np
 alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
 def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff, 
-                    dt=None, ztype='', bbtype='ca'):
+                    dt=None, ztype='', bbtype='ca', angle_unit='degree'):
     """Generate a coiled-coil backbone from Crick parameters.
 
     Generates an ideal coiled-coil backbone from given Crick parameters. If 
@@ -51,11 +51,11 @@ def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff,
         chain if cr[k - 1] == 1 and anti-parallel to chain 0 if 
         cr[k - 1] == 0.
     dph0 : list [cN - 1]
-        For each chain k (k > 0), the superhelical phase offset of chain k 
-        relative to chain 0 will be dph0[k - 1].
+        For each chain k (k > 0), the superhelical phase offset (in degrees) 
+        of chain k relative to chain 0 will be dph0[k - 1].
     zoff : list [cN - 1]
-        For each chain k (k > 0), the Z-offset of chain k relative to chain 0 
-        will be zoff[k - 1].
+        For each chain k (k > 0), the Z-offset (in Angstroms) of chain k 
+        relative to chain 0 will be zoff[k - 1].
     dt : list [cN]
         Number of additional residues to append to the termini of each chain.
     ztype : str
@@ -77,6 +77,9 @@ def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff,
             'ca' -- a backbone containing only alpha carbon (Ca) atoms
             'gly' -- a backbone containing N, Ca, C, O, and H atoms
             'ala' -- a backbone containing N, Ca, C, O, Cb, and H atoms
+    angle_unit : str
+        The unit of angles passed as arguments to this function, either 
+        'degree' or 'radian'.
 
     Returns
     -------
@@ -94,12 +97,13 @@ def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff,
     chL, ph1, cr, dph0, zoff, dt = np.array(chL), np.array(ph1), \
                                    np.array(cr), np.array(dph0), \
                                    np.array(zoff), np.array(dt)
-    # convert degrees to radians
-    w0 *= np.pi / 180.
-    w1 *= np.pi / 180.
-    a *= np.pi / 180.
-    ph1 *= np.pi / 180.
-    dph0 *= np.pi / 180.
+    if angle_unit == 'degree':
+        # convert degrees to radians
+        w0 *= np.pi / 180.
+        w1 *= np.pi / 180.
+        a *= np.pi / 180.
+        ph1 *= np.pi / 180.
+        dph0 *= np.pi / 180.
     # prepend chain 0 values to arguments with length cN - 1
     cr = np.insert(cr, 0, 1)
     dph0 = np.insert(dph0, 0, 0.)
@@ -163,7 +167,10 @@ def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff,
                 zoff[i] = zoff[i] + XYZ[res_natoms*cumul_nres[i], 2] - \
                           xyz[-res_natoms*(1 + dt[i]), 2]
             elif ztype == 'registerzoff':
-                zo = XYZ[0, 2] - xyz[-res_natoms, 2] 
+                if res_natoms == 1:
+                    zo = XYZ[0, 2] - xyz[-1, 2]
+                else:
+                    zo = XYZ[1, 2] - xyz[-res_natoms+1, 2]
                 # Start with z-offset that brings termini together. 
                 # What register z-offset does this give?
                 dz = absoluteToRegisterZoff(zo, r0, w0, w1, a, 
@@ -174,7 +181,10 @@ def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff,
                 zo = zo - dz
                 zoff[i] = zoff[i] + zo
             elif ztype == 'zoffaa':
-                zo = XYZ[0, 2] - xyz[-res_natoms, 2] 
+                if res_natoms == 1:
+                    zo = XYZ[0, 2] - xyz[-1, 2]
+                else:
+                    zo = XYZ[1, 2] - xyz[-res_natoms+1, 2]
                 # Start with z-offset that brings termini together. 
                 # What Zaa' does this give?
                 dz = absoluteToZoff_aa(zo, r0, r1, w0, w1, a, 
@@ -185,8 +195,8 @@ def generateCrickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff,
                 zo = zo - dz
                 zoff[i] = zoff[i] + zo
         T = np.array([[np.cos(dph0[i] - zoff[i] * np.tan(a) / r0), 
-                       -np.sin(dph0[i] - zoff[i] * np.tan(a) / r0), 0.], 
-                      [np.sin(dph0[i] - zoff[i] * np.tan(a) / r0), 
+                       np.sin(dph0[i] - zoff[i] * np.tan(a) / r0), 0.], 
+                      [-np.sin(dph0[i] - zoff[i] * np.tan(a) / r0), 
                        np.cos(dph0[i] - zoff[i] * np.tan(a) / r0), 0.], 
                       [0., 0., 1.]])
         xyz = np.dot(xyz, T)
@@ -291,11 +301,11 @@ def absoluteToZoff_aa(zoff, r0, r1, w0, w1, a, ph1_1, ph1_2, p_ap):
 
     # find first a-positions on chain 1
     rng = np.arange(0, 7)
-    mi = np.argmin(np.abs(                           # the position closest to
-        angleDiff(ph1_1 + w1 * rng,                  # the canonical 'a'
-                  canonicalPhases(0) * np.pi / 180.) # position phase in the 
-        ))                                           # first heptad plus a bit
-    aph1_1 = np.fmod(ph1_1 + w1 * rng[mi], 2. * np.pi)
+    mi = np.argmin(np.abs(                      # the position closest to the 
+        angleDiff(ph1_1 + w1 * rng,             # canonical 'a' position 
+                  canonicalPhases(0, 'radian')) # phase in the first heptad 
+        ))                                      # plus a bit
+    aph1_1 = fmod(ph1_1 + w1 * rng[mi], 2. * np.pi)
     az1 = w0 * rng[mi] * r0 / np.tan(a) - \
           r1 * np.sin(a) * np.sin(w1 * rng[mi] + ph1_1)
 
@@ -316,11 +326,11 @@ def absoluteToZoff_aa(zoff, r0, r1, w0, w1, a, ph1_1, ph1_2, p_ap):
     # a very bad fit and it does not matter anyway
     for count in range(100):
         # try up and down
-        for ni in range(n - count, n + count + 1):
+        for ni in [n - count, n + count]:
             aph1_2 = ph1_2 + w1 * ni
             # though phase changes sign, to determine whether something is an 
             # 'a' or not, we still need the original phase
-            if getHeptadPos(aph1_2, 1) != 0:
+            if getHeptadPos(aph1_2, True) != 0:
                 continue
             if p_ap: # chains are parallel
                 az2 = zoff + w0 * ni * r0 / np.tan(a) - \
@@ -358,7 +368,7 @@ def angleDiff(a, b):
     d : np.array
         Wrapped differences (in radians) between the angles in a and b.
     """
-    d = np.fmod(np.fmod(a, 2. * np.pi) - np.fmod(b, 2. * np.pi), 2. * np.pi)
+    d = fmod(fmod(a, 2. * np.pi) - fmod(b, 2. * np.pi), 2. * np.pi)
     if type(d) is np.float64 and d > np.pi:
         d -= 2. * np.pi
     elif type(d) is not np.float64:
@@ -366,7 +376,7 @@ def angleDiff(a, b):
     return d
 
 
-def canonicalPhases(ind):
+def canonicalPhases(ind, angle_unit='degree'):
     """Return canonical phases of positions a-g indexed by an index array.
 
        The canonical phases are:
@@ -377,6 +387,9 @@ def canonicalPhases(ind):
     ----------
     ind : np.array [7]
         Index array for the canonical phases.
+    angle_unit : str
+        The unit of angles to be returned by this function, either 
+        'degree' or 'radian'.
 
     Returns
     -------
@@ -385,6 +398,8 @@ def canonicalPhases(ind):
     """
     # in the order a-g
     median_phases = np.array([197.0, 300.0, 41.0, 146.0, 249.0, 351.0, 95.0])
+    if angle_unit == 'radian':
+        median_phases *= np.pi / 180.
     return median_phases[ind]
 
 
@@ -491,28 +506,36 @@ def getHeptadPos(ph1, return_int=False):
         The heptad position corresponding to phase ph1, either as a character 
         from a-g or an integer from 0-6.
     """
-    meds = canonicalPhases(np.arange(7)) * np.pi / 180.
+    meds = canonicalPhases(np.arange(7), 'radian')
     hps = np.array(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+
+    ph1 = fmod(ph1, 2. * np.pi)
+    if np.any(ph1 == meds):
+        if return_int:
+            return np.argwhere(ph1 == meds)
+        else:
+            return hps[ph1 == meds]
 
     # sort phases in the order they appear on the helical wheel
     si = np.argsort(meds)
     meds = meds[si]
     hps = hps[si]
 
-    ph1 = np.fmod(ph1, 2. * np.pi)
     for i in range(len(meds)):
         pin = i - 1
+        nin = i + 1
+        if i == 0:
+            pin = len(meds) - 1
         if i == len(meds) - 1:
             nin = 0
-        else:
-            nin = i + 1
-        lb = np.fmod(angleDiff(meds[pin], meds[i]) / 2. + meds[i], 2. * np.pi) 
-        ub = np.fmod(angleDiff(meds[nin], meds[i]) / 2. + meds[i], 2. * np.pi)
+        lb = fmod(angleDiff(meds[pin], meds[i]) / 2. + meds[i], 2. * np.pi) 
+        ub = fmod(angleDiff(meds[nin], meds[i]) / 2. + meds[i], 2. * np.pi)
         if angleDiff(ph1, lb) > 0 and angleDiff(ub, ph1) > 0:
             if return_int:
                 return 'abcdefg'.index(hps[i])
             else:
                 return hps[i]
+    raise ValueError('{} {}'.format(ph1, meds))
 
 
 def retrieve_name(var):
@@ -531,3 +554,21 @@ def retrieve_name(var):
     callers_local_vars = inspect.currentframe().f_back.f_locals.items()
     return [var_name for var_name, var_val in callers_local_vars if 
             var_val is var][0]
+
+
+def fmod(x, m):
+    """Returns x - floor(x / m) * y if y != 0.
+
+    Parameters
+    ----------
+    x : float
+        Number to compute modulo m.
+    m : float
+        Modulus of the computation.
+
+    Returns
+    -------
+    y : float
+        x - floor(x / m) * m
+    """
+    return x - np.floor(x / m) * m
