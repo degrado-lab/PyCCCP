@@ -23,8 +23,10 @@ from Bio.PDB import PDBParser
 from pycccp.generateCrickBB import *
 from pycccp.PDBIO import *
 
+alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
 def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[], 
-               bbtype='ca', angle_units='degree'):
+               selection='', bbtype='ca', angle_units='degree'):
     """Fit Crick parameters to an input structure.
 
     Fits Crick parameters given the structure in pdbfile. If you use this 
@@ -79,14 +81,23 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     mask : list
         If not empty, removes the contribution of certain atoms to the total 
         error (and hence the overall fit). Must have the same number of 
-        elements as the total number of residues in the structure. Elements 
-        should be either 0 (indicating that the corresponding residue does not 
-        contribute) or 1 (indicating that the residue does contribute). The 
-        order of residues starts with the first residue of the first chain and 
-        goes on to the last residue of the last chain, as listed in pdbfile. 
-        So, for example, if we have a trimer with 28 residues in each monomer, 
-        and we'd like to remov ethe contribution of the C-terminal residues 
-        of the second chain, mask would be set to [1]*50 + [0]*6 + [1]*28.
+        elements as the total number of residues in the structure (after the 
+        selection is applied; see below). Elements should be either 0 
+        (indicating that the corresponding residue does not contribute) or 1 
+        (indicating that the residue does contribute). The order of residues 
+        starts with the first residue of the first chain and goes on to the 
+        last residue of the last chain, as listed in pdbfile. So, for example, 
+        if we have a trimer with 28 residues in each monomer, and we'd like to 
+        remove the contribution of the C-terminal residues of the second chain, 
+        mask would be set to [1]*50 + [0]*6 + [1]*28.
+    selection : str
+        If empty, the entire structure from pdbfile will be aligned against. 
+        Otherwise, a selection of residues should be provided such that 
+        discontiguous fragments are separated by colons and a one-letter chain 
+        identifier is provided at the beginning of the each fragment that 
+        begins a new chain. For example, "A7-32:39-64:B7-32:39-64" would 
+        specify residues 7 to 32 (inclusive) and 39 to 64 for both chains A 
+        and B of a structure.
     bbtype : str
         The type of backbone to generate for the fitted structure. It should 
         be one of the following strings:
@@ -121,7 +132,11 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
 
     parser = PDBParser()
     structure = parser.get_structure('coil', pdbfile)
-    M0 = np.array([a.coord for a in structure.get_atoms() if a.name == 'CA'])
+    if selection:
+        M0 = select_coords(structure, selection)
+    else:
+        M0 = np.array([a.coord for a in structure.get_atoms() 
+                       if a.name == 'CA'])
 
     if len(mask):
         assert len(mask) == len(M0)
@@ -201,6 +216,7 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
 
     r0, r1, w0, w1, a, ph1, zoff, dph0, J0 = \
         unpack_params(res.x, pType, cN, chL, co, cr)
+    ph1 = fmod(ph1, 2. * np.pi)
     heptad = [getHeptadPos(ph1[i], False) for i in range(cN)]
     t_a = np.array([(7 - getHeptadPos(ph1[i], True)) % 7 for i in range(cN)])
     phCa = fmod(w1 * t_a + ph1 + np.pi, 2. * np.pi)
@@ -829,3 +845,53 @@ def populate_omegas(U, S, Vt):
                 omega_U[i, j, l, k] = -omega_U[i, j, k, l]
                 omega_Vt[i, j, k, l] = -omega_Vt[i, j, l, k]
     return omega_U, omega_Vt
+
+
+def select_coords(structure, selection):
+    """Select CA coordinates from a structure given a selection string.
+
+    Parameters
+    ----------
+    structure : Bio.PDB.Structure
+        The structure from the PDB file, upon which to perform the selection.
+    selection : str 
+        If empty, the entire structure from pdbfile will be aligned against. 
+        Otherwise, a selection of residues should be provided such that 
+        discontiguous fragments are separated by colons and a one-letter chain 
+        identifier is provided at the beginning of the each fragment that 
+        begins a new chain. For example, "A7-32:39-64:B7-32:39-64" would 
+        specify residues 7 to 32 (inclusive) and 39 to 64 for both chains A 
+        and B of a structure.
+    
+    Returns
+    -------
+    ca_coords : np.array [n_atoms x 3]
+        The coordinates of the CA atoms from the selected residues.
+    """
+    fragments = selection.split(':')
+    if fragments[0][0] not in alphabet:
+        raise ValueError(('The first fragment in the selection must have '
+                          'a chain ID!'))
+    sel_chains_resnums = [] 
+    current_chain = fragments[0][0]
+    for fragment in fragments:
+        if fragment[0] == current_chain:
+            fragment = fragment[1:]
+        elif fragment[0] in alphabet:
+            current_chain = fragment[0]
+            fragment = fragment[1:]
+        if '-' in fragment:
+            start, end = [int(val) for val in fragment.split('-')]
+        else:
+            start, end = int(fragment), int(fragment)
+        for i in range(start, end + 1):
+            sel_chains_resnums.append((current_chain, i))
+    chains_resnums_to_coords = {}
+    for a in structure.get_atoms():
+        chain_resnum = (a.get_parent().get_parent().id, 
+                        a.get_parent().id[1])
+        if chain_resnum not in chains_resnums_to_coords.keys() \
+                and a.name == 'CA':
+            chains_resnums_to_coords[chain_resnum] = a.coord
+    return np.array([chains_resnums_to_coords[chain_resnum] 
+                     for chain_resnum in sel_chains_resnums])
