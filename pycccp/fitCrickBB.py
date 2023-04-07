@@ -20,8 +20,8 @@ from scipy.optimize import minimize
 
 from Bio.PDB import PDBParser
 
-from generateCrickBB import *
-from PDBIO import *
+from pycccp.generateCrickBB import *
+from pycccp.PDBIO import *
 
 def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[], 
                bbtype='ca', angle_units='degree'):
