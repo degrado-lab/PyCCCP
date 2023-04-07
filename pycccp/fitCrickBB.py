@@ -765,14 +765,14 @@ def kabsch(X, Y):
     """
     n = len(X)
     # compute R using the Kabsch algorithm
-    Xc = X - np.mean(X, axis=0)
-    Yc = Y - np.mean(Y, axis=0)
+    Xbar, Ybar = np.mean(X, axis=0), np.mean(Y, axis=0)
+    Xc, Yc = X - Xbar, Y - Ybar
     H = np.dot(Xc.T, Yc)
     U, S, Vt = np.linalg.svd(H)
     d = np.sign(np.linalg.det(np.dot(U, Vt)))
     D = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., d]])
     R = np.dot(U, np.dot(D, Vt))
-    t = Yc - np.dot(Xc, R)
+    t = Ybar - np.dot(Xbar, R)
     # compute SSD from aligned coordinates XR
     XRmY = np.dot(Xc, R) - Yc
     ssd = np.sum(XRmY ** 2)
