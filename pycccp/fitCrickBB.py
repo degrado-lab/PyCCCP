@@ -157,12 +157,13 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     M = M0[mask] - M0bar
     H = np.dot(M.T, M)
     w, v = np.linalg.eigh(H)
-    if np.linalg.det(v) < 0:
-        v[:, 2] = -v[:, 2] # ensure the PC frame is right-handed
     if np.dot(v[:, 2], M[chL] - M[0]) < 0:
         v *= -1. # ensure Z is approximately parallel to the first helix
+    if np.linalg.det(v) < 0:
+        v[:, 1] = -v[:, 1] # ensure the PC frame is right-handed
     M = np.dot(M, v) # rotate bundle into principal component (PC) frame
-    structure.transform(v, -np.dot(M0bar, v)) # transform reference structure
+    structure.transform(v, -np.dot(v.T, M0bar))
+    '''
     dist = np.zeros(cN) # centroid distances to the Z-axis
     centroid_0 = M[:chL].mean(axis=0)
     dist[0] = np.sqrt(centroid_0[0] ** 2 + centroid_0[1] ** 2)
@@ -171,47 +172,56 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
              np.arccos(centroid_0[0] / dist[0]))     # about Z to put the  
                                                      # centroid of the first
                                                      # chain in the XZ plane 
+    '''
 
     # compute rotation angle of each chain's centroid about the first PC axis, 
     # in the interval [0, 2*pi), along with orientations and crossing angles
+    dist = np.zeros(cN) # centroid distances to the Z-axis
     chain_thetas = 2. * np.pi * np.ones(cN)
     cr = np.ones(cN) # orientations
-    crsg = np.zeros(cN - 1) # crossing angles
+    for i in range(cN):
+        centroid = M[chL*i:chL*(i+1)].mean(axis=0)
+        dist[i] = np.sqrt(centroid[0] ** 2 + centroid[1] ** 2)
+        if i > 0:
+            chain_thetas[i] = np.arctan2(centroid[1], centroid[0]) + np.pi
+            cr[i] = (M[chL*(i+1)-1, 2] - M[chL*i, 2] > 0)
+        else:
+            assert (M[chL*(i+1)-1, 2] - M[chL*i, 2] > 0)
+    '''
     for i in range(1, cN):
         centroid_i = M[chL*i:chL*(i+1)].mean(axis=0)
         dist[i] = np.sqrt(centroid_i[0] ** 2 + centroid_i[1] ** 2)
-        theta = np.pi * (1. - np.sign(centroid_i[1])) + \
-                np.sign(centroid_i[1]) * \
-                np.arccos(centroid_i[0] / dist[i])
+        theta = np.arctan2(centroid_i[1], centroid_i[0])
+        # theta = np.pi * (1. - np.sign(centroid_i[1])) + \
+        #         np.sign(centroid_i[1]) * \
+        #         np.arccos(centroid_i[0] / dist[i])
         chain_thetas[i] = theta
         cr[i] = (M[chL*(i+1)-1, 2] - M[chL*i, 2] > 0)
-        if i != cN - 1:
-            crsg[i - 1] = crossingAngle(M[:chL], M[chL*i:chL*(i+1)], cr[i])
+    '''
     # determine chain order (clockwise)
     co = np.argsort(chain_thetas)[::-1]
 
     if len(IP) == 0:
-        alpha_guess = np.mean(crsg) / 1.3 # guess pitch angle as a function 
-                                          # of crossing angle
+        ideal = ideal_helix(7, start=-3)
+        R, t, ssd, _ = kabsch(ideal, M[:7])
+        sgn = np.sign(np.dot(t, np.cross(R[:, 2], np.array([0, 0, 1]))))
+        alpha_guess = sgn * np.arccos(R[2, 2])
         IP = [np.mean(dist), # r0
               2.26, # r1
-              1.51 * np.sin(alpha_guess / 5.0), # w0
+              1.51 * np.sin(alpha_guess) / np.mean(dist), # w0
               4. * np.pi / 7., # w1
               alpha_guess, # alpha
-              0.] # ph1
+              np.arctan2(t[1], t[0])] # ph1
   
     p0 = prepare_guess(IP, cN, chL, co, cr, pType)
-    r0, r1, w0, w1, a, ph1, zoff, dph0, J0 = \
-        unpack_params(p0, pType, cN, chL, co, cr)
-    XYZ, _ = crickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr[1:], dph0, zoff)
-
-    res = minimize(crickSSD, p0, args=(M, pType, cN, co, cr, True), 
-                   method='BFGS', jac=True, tol=0.001)
+    res = minimize(crickSSD, p0, args=(M, pType, cN, co, cr, True),
+                   method='L-BFGS-B', jac=True, tol=0.001)
+    print(res.message)
+    res.x = p0
     ssd, _, R, t = crickSSD(res.x, M, pType, cN, co, cr, False)
     err = np.sqrt(ssd / n)
 
     # align coordinates of initial structure with ideal structure
-    coords = np.array([a.coord for a in structure.get_atoms()])
     structure.transform(R, t)
 
     r0, r1, w0, w1, a, ph1, zoff, dph0, J0 = \
@@ -750,6 +760,38 @@ def dihe(p1, p2, p3, p4):
     y = np.dot(np.cross(px1, v32 / np.linalg.norm(v32)), px2) 
 
     return np.arctan2(y, x)
+
+
+def ideal_helix(n_residues, rise=1.5, twist=100, radius=2.3, start=0):
+    """Generate coordinates for an ideal helix.
+
+    Parameters
+    ----------
+    n_residues : int
+        Number of residues in the helix.
+    rise : float, optional
+        Rise per residue of the helix in Angstroms. Default is 1.5.
+    twist : float, optional
+        Twist per residue of the helix in degrees. Default is 100.
+    radius : float, optional
+        Radius of the helix in Angstroms. Default is 2.3.
+    start : int, optional
+        Which residue to start the helix on. The residue with index
+        0 will always lie along the x-axis.  Default is 0.
+
+    Returns
+    -------
+    coords : np.array [n_points x 3]
+        Array of coordinates for the ideal helix.
+    """
+    t = np.linspace(start * twist * np.pi / 180,
+                    (n_residues + start) * twist * np.pi / 180,
+                    n_residues, endpoint=False)
+    x = radius * np.cos(t)
+    y = radius * np.sin(t)
+    z = np.linspace(0, n_residues * rise, n_residues,
+                    endpoint=False)
+    return np.array([x, y, z]).T
 
 
 def kabsch(X, Y):

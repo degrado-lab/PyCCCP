@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pycccp"
-version = "0.0.1"
+version = "0.0.2"
 description = "Fast and user-friendly coiled coil generation and fitting on Google Colab."
 authors = [
     "Rian Kormos <rian.kormos@ucsf.edu>"
@@ -17,6 +17,8 @@ classifiers = [
 python = ">=3.7.1,<3.11"
 matplotlib = "^3.2.2"
 numpy = "^1.21.6"
+scipy = "^1.9.0"
+numba = "^0.56.0"
 biopython = "^1.71"
 requests = "^2.26.0"
 tqdm = "^4.62.2"
