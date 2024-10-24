@@ -157,7 +157,7 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     M = M0[mask] - M0bar
     H = np.dot(M.T, M)
     w, v = np.linalg.eigh(H)
-    if np.dot(v[:, 2], M[chL] - M[0]) < 0:
+    if np.dot(v[:, 2], M[chL - 1] - M[0]) < 0:
         v *= -1. # ensure Z is approximately parallel to the first helix
     if np.linalg.det(v) < 0:
         v[:, 1] = -v[:, 1] # ensure the PC frame is right-handed
