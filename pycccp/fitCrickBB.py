@@ -185,8 +185,6 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
         if i > 0:
             chain_thetas[i] = np.arctan2(centroid[1], centroid[0]) + np.pi
             cr[i] = (M[chL*(i+1)-1, 2] - M[chL*i, 2] > 0)
-        else:
-            assert (M[chL*(i+1)-1, 2] - M[chL*i, 2] > 0)
     '''
     for i in range(1, cN):
         centroid_i = M[chL*i:chL*(i+1)].mean(axis=0)
@@ -204,8 +202,7 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     if len(IP) == 0:
         ideal = ideal_helix(7, start=-3)
         R, t, ssd, _ = kabsch(ideal, M[:7])
-        sgn = np.sign(np.dot(t, np.cross(R[:, 2], np.array([0, 0, 1]))))
-        alpha_guess = sgn * np.arccos(R[2, 2])
+        alpha_guess = -np.arccos(R[2, 2])
         IP = [np.mean(dist), # r0
               2.26, # r1
               1.51 * np.sin(alpha_guess) / np.mean(dist), # w0
