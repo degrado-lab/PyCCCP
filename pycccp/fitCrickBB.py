@@ -1,15 +1,15 @@
 # Copyright (C) 2023 Rian Kormos
-#   This program is free software: you can redistribute it and/or modify it 
-#   under the terms of the GNU General Public License as published by the 
-#   Free Software Foundation, either version 3 of the License, or (at your 
+#   This program is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU General Public License as published by the
+#   Free Software Foundation, either version 3 of the License, or (at your
 #   option) any later version.
 #
-#   This program is distributed in the hope that it will be useful, but 
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
-#   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License 
+#   This program is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+#   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 #   for more details.
 #
-#   You should have received a copy of the GNU General Public License along 
+#   You should have received a copy of the GNU General Public License along
 #   with this program. If not, see <http://www.gnu.org/licenses/>
 
 import sys
@@ -25,13 +25,13 @@ from pycccp.PDBIO import *
 
 alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[], 
+def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
                selection='', bbtype='ca', angle_units='degree'):
     """Fit Crick parameters to an input structure.
 
-    Fits Crick parameters given the structure in pdbfile. If you use this 
-    program in your research, please cite G. Grigoryan, W. F. DeGrado, 
-    "Probing Designability via a Generalized Model of Helical Bundle 
+    Fits Crick parameters given the structure in pdbfile. If you use this
+    program in your research, please cite G. Grigoryan, W. F. DeGrado,
+    "Probing Designability via a Generalized Model of Helical Bundle
     Geometry", J. Mol. Biol., 405(4): 1079-1100 (2011).
 
     Parameters
@@ -39,27 +39,27 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     pdbfile : str
        Path to PDB file from which to extract CA atoms for fitting.
     cN : int
-       The number of chains in the file. The number of coordinates has to be 
+       The number of chains in the file. The number of coordinates has to be
        divisible by cN.
     pType : str
-       The parameterization type. All fits include superhelical radius (r0), 
-       helical radius (r1), superhelical frequency (w0), helical frequency 
-       (w1), and pitch angle (a) as global parameters. pType then controls 
-       which of the remaining parameters are local to each chain and which 
+       The parameterization type. All fits include superhelical radius (r0),
+       helical radius (r1), superhelical frequency (w0), helical frequency
+       (w1), and pitch angle (a) as global parameters. pType then controls
+       which of the remaining parameters are local to each chain and which
        are global. Choices are:
-           'GENERAL' -- this is the most general option and means that each 
-           helix gets its own helical phase (ph1), superhelical phase offset 
+           'GENERAL' -- this is the most general option and means that each
+           helix gets its own helical phase (ph1), superhelical phase offset
            (dph0) and Z offset (Zoff), regardless of orientation
-           'SYMMETRIC' -- the most symmetric option. ph1 is still individual 
-           to each chain, but there is only one Zoff denoting the offset 
-           between all parallel and antiparallel chains (i.e. all chains 
-           sharing direction are assumed to have zero offset with respect to 
-           each other). Also, for parallel topologies, dph0 is fixed at 
-           i*2*pi. Nc for the i-th chain (so dph0 is not a parameter). For 
-           strictly alternating topologies (up, down, up, down, ...), one 
-           dph0 parameter is allowed to denote the relative rotation of all 
-           parallel chains with respect to all anti-parallel chains. NOTE: 
-           this requires that chains alternate direction in the order listed 
+           'SYMMETRIC' -- the most symmetric option. ph1 is still individual
+           to each chain, but there is only one Zoff denoting the offset
+           between all parallel and antiparallel chains (i.e. all chains
+           sharing direction are assumed to have zero offset with respect to
+           each other). Also, for parallel topologies, dph0 is fixed at
+           i*2*pi. Nc for the i-th chain (so dph0 is not a parameter). For
+           strictly alternating topologies (up, down, up, down, ...), one
+           dph0 parameter is allowed to denote the relative rotation of all
+           parallel chains with respect to all anti-parallel chains. NOTE:
+           this requires that chains alternate direction in the order listed
            in the input file.
            'ZOFF-SYMM' -- same as GENERAL, but Zoff is treated as in SYMMETRIC.
            'DPH0-SYMM' -- same as GENERAL, but dph0 is treated as in SYMMETRIC.
@@ -67,47 +67,47 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
            'SYMMETRIC-HLXPH' -- same as SYMMETRIC, but all chains share ph1.
            'ZOFF-SYMM-HLXPH' -- same as ZOFF-SYMM, but all chains share ph1.
     IP : list
-        Initial parameters for the search. Must be either empty (i.e. []), in 
-        which case initialization is done automatically (recommended) or have 
-        six entries, signifying starting values for the parameters r0, r1, w0, 
+        Initial parameters for the search. Must be either empty (i.e. []), in
+        which case initialization is done automatically (recommended) or have
+        six entries, signifying starting values for the parameters r0, r1, w0,
         w1, a, ph1 in that order (one value for each, even if various non-
         symmetric options are specified).
     LB : list
-        Lower bounds for parameters. Can be left empty (recommended) or must 
+        Lower bounds for parameters. Can be left empty (recommended) or must
         be of the same length as IP. If non-empty, UB must also be non-empty.
     UB : list
-        Upper bounds for parameters. Can be left empty (recommended) or must 
+        Upper bounds for parameters. Can be left empty (recommended) or must
         be of the same length as IP. If non-empty, LB must also be non-empty.
     mask : list
-        If not empty, removes the contribution of certain atoms to the total 
-        error (and hence the overall fit). Must have the same number of 
-        elements as the total number of residues in the structure (after the 
-        selection is applied; see below). Elements should be either 0 
-        (indicating that the corresponding residue does not contribute) or 1 
-        (indicating that the residue does contribute). The order of residues 
-        starts with the first residue of the first chain and goes on to the 
-        last residue of the last chain, as listed in pdbfile. So, for example, 
-        if we have a trimer with 28 residues in each monomer, and we'd like to 
-        remove the contribution of the C-terminal residues of the second chain, 
+        If not empty, removes the contribution of certain atoms to the total
+        error (and hence the overall fit). Must have the same number of
+        elements as the total number of residues in the structure (after the
+        selection is applied; see below). Elements should be either 0
+        (indicating that the corresponding residue does not contribute) or 1
+        (indicating that the residue does contribute). The order of residues
+        starts with the first residue of the first chain and goes on to the
+        last residue of the last chain, as listed in pdbfile. So, for example,
+        if we have a trimer with 28 residues in each monomer, and we'd like to
+        remove the contribution of the C-terminal residues of the second chain,
         mask would be set to [1]*50 + [0]*6 + [1]*28.
     selection : str
-        If empty, the entire structure from pdbfile will be aligned against. 
-        Otherwise, a selection of residues should be provided such that 
-        discontiguous fragments are separated by colons and a one-letter chain 
-        identifier is provided at the beginning of the each fragment that 
-        begins a new chain. For example, "A7-32:39-64:B7-32:39-64" would 
-        specify residues 7 to 32 (inclusive) and 39 to 64 for both chains A 
+        If empty, the entire structure from pdbfile will be aligned against.
+        Otherwise, a selection of residues should be provided such that
+        discontiguous fragments are separated by colons and a one-letter chain
+        identifier is provided at the beginning of the each fragment that
+        begins a new chain. For example, "A7-32:39-64:B7-32:39-64" would
+        specify residues 7 to 32 (inclusive) and 39 to 64 for both chains A
         and B of a structure.
     bbtype : str
-        The type of backbone to generate for the fitted structure. It should 
+        The type of backbone to generate for the fitted structure. It should
         be one of the following strings:
             'ca' -- a backbone containing only alpha carbon (Ca) atoms
             'gly' -- a backbone containing N, Ca, C, O, and H atoms
             'ala' -- a backbone containing N, Ca, C, O, Cb, and H atoms
     angle_units : float
-        Units of the angles that will be returned in params_dict.  Must be 
+        Units of the angles that will be returned in params_dict.  Must be
         either 'radian' or 'degree'.
-    
+
     Outputs
     -------
     params_dict : dict
@@ -119,14 +119,14 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     chains : np.array [n_atoms]
         One-letter chain identifiers of each residue in the ideal structure.
     structure : BIO.PDB.Structure
-        The structure from the PDB file, with coordinates transformed to align 
+        The structure from the PDB file, with coordinates transformed to align
         with minimal SSD to the ideal structure.
     """
-    if pType not in ['GENERAL', 'SYMMETRIC', 'ZOFF-SYMM', 'DPH0-SYMM', 
-                     'GENERAL-HLXPH', 'SYMMETRIC-HLXPH', 'ZOFF-SYMM-HLXPH', 
+    if pType not in ['GENERAL', 'SYMMETRIC', 'ZOFF-SYMM', 'DPH0-SYMM',
+                     'GENERAL-HLXPH', 'SYMMETRIC-HLXPH', 'ZOFF-SYMM-HLXPH',
                      'DPH0-SYMM-HLXPH']:
         raise ValueError('Unknown parameterization type {}'.format(pType))
-    
+
     if len(IP) not in [0, 6]:
         raise ValueError('Unexpected number of initial parameters!')
 
@@ -135,7 +135,7 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     if selection:
         M0 = select_coords(structure, selection)
     else:
-        M0 = np.array([a.coord for a in structure.get_atoms() 
+        M0 = np.array([a.coord for a in structure.get_atoms()
                        if a.name == 'CA'])
 
     if len(mask):
@@ -149,9 +149,9 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     if n % cN:
         raise ValueError(('Number of unmasked coordinates {} is not divisible '
                           'by the number of chains {}.').format(n, cN))
-    
-    # subtract centroid of input bundle coordinates and rotate such that the 
-    # first principal axis of the input bundle aligns with Z and the centroid 
+
+    # subtract centroid of input bundle coordinates and rotate such that the
+    # first principal axis of the input bundle aligns with Z and the centroid
     # of the first chain has a Y-coordinate of 0
     M0bar = np.mean(M0[mask], axis=0)
     M = M0[mask] - M0bar
@@ -167,14 +167,14 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
     dist = np.zeros(cN) # centroid distances to the Z-axis
     centroid_0 = M[:chL].mean(axis=0)
     dist[0] = np.sqrt(centroid_0[0] ** 2 + centroid_0[1] ** 2)
-    theta = (np.pi * (1. - np.sign(centroid_0[1])) + # compute angle required 
+    theta = (np.pi * (1. - np.sign(centroid_0[1])) + # compute angle required
              np.sign(centroid_0[1]) *                # to rotate the bundle
-             np.arccos(centroid_0[0] / dist[0]))     # about Z to put the  
+             np.arccos(centroid_0[0] / dist[0]))     # about Z to put the
                                                      # centroid of the first
-                                                     # chain in the XZ plane 
+                                                     # chain in the XZ plane
     '''
 
-    # compute rotation angle of each chain's centroid about the first PC axis, 
+    # compute rotation angle of each chain's centroid about the first PC axis,
     # in the interval [0, 2*pi), along with orientations and crossing angles
     dist = np.zeros(cN) # centroid distances to the Z-axis
     chain_thetas = 2. * np.pi * np.ones(cN)
@@ -209,12 +209,11 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
               4. * np.pi / 7., # w1
               alpha_guess, # alpha
               np.arctan2(t[1], t[0])] # ph1
-  
+
     p0 = prepare_guess(IP, cN, chL, co, cr, pType)
     res = minimize(crickSSD, p0, args=(M, pType, cN, co, cr, True),
-                   method='L-BFGS-B', jac=True, tol=0.001)
+                   method='L-BFGS-B', jac=True, tol=1e-6)
     print(res.message)
-    res.x = p0
     ssd, _, R, t = crickSSD(res.x, M, pType, cN, co, cr, False)
     err = np.sqrt(ssd / n)
 
@@ -239,22 +238,22 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
             zo = 0.
         else:
             zo = XYZ[0, 2] - XYZ[(i+1)*chL-1, 2] + zoff[i - 1]
-        dz_register = absoluteToRegisterZoff(zo, r0, w0, w1, a, 
+        dz_register = absoluteToRegisterZoff(zo, r0, w0, w1, a,
                                              ph1[0], ph1[i], cr[i])
-        dz_aa = absoluteToZoff_aa(zo, r0, r1, w0, w1, a, 
+        dz_aa = absoluteToZoff_aa(zo, r0, r1, w0, w1, a,
                                   ph1[0], ph1[i], cr[i])
         zoff_apNN[i - 1] = zoff[i - 1] - zo
         zoff_register[i - 1] = zoff[i - 1] - zo + dz_register
         zoff_aa[i - 1] = zoff[i - 1] - zo + dz_aa
-    # adjust dph0 according to zoff, r0, and a to match the definition used 
+    # adjust dph0 according to zoff, r0, and a to match the definition used
     # by generateCrickBB.py
     dph0 = fmod(dph0 + zoff * np.tan(a) / r0, 2. * np.pi)
-    
-    xyz, chains = generateCrickBB(cN, chL, r0, r1, w0, w1, a, list(ph1), 
-                                  list(cr[1:]), list(dph0), 
-                                  list(zoff_register), None, 
+
+    xyz, chains = generateCrickBB(cN, chL, r0, r1, w0, w1, a, list(ph1),
+                                  list(cr[1:]), list(dph0),
+                                  list(zoff_register), None,
                                   'registerzoff', 'ala', 'radian')
-    
+
     if angle_units == 'degree':
         w0 *= 180. / np.pi
         w1 *= 180. / np.pi
@@ -263,16 +262,16 @@ def fitCrickBB(pdbfile, cN, pType='GENERAL', IP=[], LB=[], UB=[], mask=[],
         phCa *= 180. / np.pi
         dph0 *= 180. / np.pi
 
-    params_dict = {'cN' : cN, 'chL' : chL, 'r0' : r0, 'r1' : r1, 
-                   'w0' : w0, 'w1' : w1, 'a' : a, 'pitch' : P, 
+    params_dict = {'cN' : cN, 'chL' : chL, 'r0' : r0, 'r1' : r1,
+                   'w0' : w0, 'w1' : w1, 'a' : a, 'pitch' : P,
                    'cr' : list(cr[1:]), 'ph1' : list(ph1), 'phCa' : list(phCa),
-                   'dph0' : list(dph0), 'zoff_apNN' : list(zoff_apNN), 
-                   'zoff_register' : list(zoff_register), 
-                   'zoff_aa' : list(zoff_aa), 
+                   'dph0' : list(dph0), 'zoff_apNN' : list(zoff_apNN),
+                   'zoff_register' : list(zoff_register),
+                   'zoff_aa' : list(zoff_aa),
                    'starting_heptad_pos' : heptad}
 
     return params_dict, err, xyz, chains, structure
-    
+
 
 def prepare_guess(IP, cN, chL, co, cr, pType):
     """Prepare vector of initial parameters given a parameterization type.
@@ -280,37 +279,37 @@ def prepare_guess(IP, cN, chL, co, cr, pType):
     Parameters
     ----------
     IP : list
-        Initial parameters for the search. Must have six entries, signifying 
+        Initial parameters for the search. Must have six entries, signifying
         starting values for the parameters r0, r1, w0, w1, a, ph1.
     cN : int
         The number of chains in the ideal parametric backbone.
     chL : int
         The length of each chain (in amino acid residues).
     co : np.array [cN]
-        The indices necessary to sort the chains into clockwise order, 
+        The indices necessary to sort the chains into clockwise order,
         beginning from the first chain.
     cr : np.array [cN - 1]
-        For each chain k (k > 0), its orientation is parallel to the zeroth 
+        For each chain k (k > 0), its orientation is parallel to the zeroth
         chain if cr[k - 1] == 1 and anti-parallel to chain 0 if cr[k - 1] == 0.
     pType : str
-       The parameterization type. All fits include superhelical radius (r0), 
-       helical radius (r1), superhelical frequency (w0), helical frequency 
-       (w1), and pitch angle (a) as global parameters. pType then controls 
-       which of the remaining parameters are local to each chain and which 
+       The parameterization type. All fits include superhelical radius (r0),
+       helical radius (r1), superhelical frequency (w0), helical frequency
+       (w1), and pitch angle (a) as global parameters. pType then controls
+       which of the remaining parameters are local to each chain and which
        are global. Choices are:
-           'GENERAL' -- this is the most general option and means that each 
-           helix gets its own helical phase (ph1), superhelical phase offset 
+           'GENERAL' -- this is the most general option and means that each
+           helix gets its own helical phase (ph1), superhelical phase offset
            (dph0) and Z offset (Zoff), regardless of orientation
-           'SYMMETRIC' -- the most symmetric option. ph1 is still individual 
-           to each chain, but there is only one Zoff denoting the offset 
-           between all parallel and antiparallel chains (i.e. all chains 
-           sharing direction are assumed to have zero offset with respect to 
-           each other). Also, for parallel topologies, dph0 is fixed at 
-           i*2*pi.Nc for the i-th chain (so dph0 is not a parameter). For 
-           strictly alternating topologies (up, down, up, down, ...), one 
-           dph0 parameter is allowed to denote the relative rotation of all 
-           parallel chains with respect to all anti-parallel chains. NOTE: 
-           this requires that chains alternate direction in the order listed 
+           'SYMMETRIC' -- the most symmetric option. ph1 is still individual
+           to each chain, but there is only one Zoff denoting the offset
+           between all parallel and antiparallel chains (i.e. all chains
+           sharing direction are assumed to have zero offset with respect to
+           each other). Also, for parallel topologies, dph0 is fixed at
+           i*2*pi.Nc for the i-th chain (so dph0 is not a parameter). For
+           strictly alternating topologies (up, down, up, down, ...), one
+           dph0 parameter is allowed to denote the relative rotation of all
+           parallel chains with respect to all anti-parallel chains. NOTE:
+           this requires that chains alternate direction in the order listed
            in the input file.
            'ZOFF-SYMM' -- same as GENERAL, but Zoff is treated as in SYMMETRIC.
            'DPH0-SYMM' -- same as GENERAL, but dph0 is treated as in SYMMETRIC.
@@ -333,10 +332,10 @@ def prepare_guess(IP, cN, chL, co, cr, pType):
 
     if 'GENERAL' in pType:
         p0 += [0. if cr[i] else chZ for i in range(1, cN)]
-        p0 += [co[-1:0:-1][i] * 2. * np.pi / cN if cr[i + 1] else 
-               co[-1:0:-1][i] * 2. * np.pi / cN + IP[2] * chL 
+        p0 += [co[-1:0:-1][i] * 2. * np.pi / cN if cr[i + 1] else
+               co[-1:0:-1][i] * 2. * np.pi / cN + IP[2] * chL
                for i in range(cN - 1)]
-    
+
     if 'SYMMETRIC' in pType:
         p0 += [0.] # Only one Zoff parameter, no dph0
 
@@ -351,49 +350,49 @@ def prepare_guess(IP, cN, chL, co, cr, pType):
 
 
 def unpack_params(p, pType, cN, chL, co, cr):
-    """Unpack a full set of Crick parameters from a reduced set corresponding 
+    """Unpack a full set of Crick parameters from a reduced set corresponding
        to a particular parameterization type.
 
     Parameters
     ----------
     p : np.array [n_param]
-        Array of reduced parameters, with a length corresponding to the number 
+        Array of reduced parameters, with a length corresponding to the number
         of free parameters given pType (see documentation for pType).
     pType : str
-       The parameterization type. All fits include superhelical radius (r0), 
-       helical radius (r1), superhelical frequency (w0), helical frequency 
-       (w1), and pitch angle (a) as global parameters. pType then controls 
-       which of the remaining parameters are local to each chain and which 
+       The parameterization type. All fits include superhelical radius (r0),
+       helical radius (r1), superhelical frequency (w0), helical frequency
+       (w1), and pitch angle (a) as global parameters. pType then controls
+       which of the remaining parameters are local to each chain and which
        are global. Choices are:
-           'GENERAL' -- this is the most general option and means that each 
-           helix gets its own helical phase (ph1), superhelical phase offset 
+           'GENERAL' -- this is the most general option and means that each
+           helix gets its own helical phase (ph1), superhelical phase offset
            (dph0) and Z offset (Zoff), regardless of orientation
-           'SYMMETRIC' -- the most symmetric option. ph1 is still individual 
-           to each chain, but there is only one Zoff denoting the offset 
-           between all parallel and antiparallel chains (i.e. all chains 
-           sharing direction are assumed to have zero offset with respect to 
-           each other). Also, for parallel topologies, dph0 is fixed at 
-           i*2*pi.Nc for the i-th chain (so dph0 is not a parameter). For 
-           strictly alternating topologies (up, down, up, down, ...), one 
-           dph0 parameter is allowed to denote the relative rotation of all 
-           parallel chains with respect to all anti-parallel chains. NOTE: 
-           this requires that chains alternate direction in the order listed 
+           'SYMMETRIC' -- the most symmetric option. ph1 is still individual
+           to each chain, but there is only one Zoff denoting the offset
+           between all parallel and antiparallel chains (i.e. all chains
+           sharing direction are assumed to have zero offset with respect to
+           each other). Also, for parallel topologies, dph0 is fixed at
+           i*2*pi.Nc for the i-th chain (so dph0 is not a parameter). For
+           strictly alternating topologies (up, down, up, down, ...), one
+           dph0 parameter is allowed to denote the relative rotation of all
+           parallel chains with respect to all anti-parallel chains. NOTE:
+           this requires that chains alternate direction in the order listed
            in the input file.
            'ZOFF-SYMM' -- same as GENERAL, but Zoff is treated as in SYMMETRIC.
            'DPH0-SYMM' -- same as GENERAL, but dph0 is treated as in SYMMETRIC.
            'GENERAL-HLXPH' -- same as GENERAL, but all chains share ph1.
            'SYMMETRIC-HLXPH' -- same as SYMMETRIC, but all chains share ph1.
-           'ZOFF-SYMM-HLXPH' -- same as ZOFF-SYMM, but all chains share ph1. 
+           'ZOFF-SYMM-HLXPH' -- same as ZOFF-SYMM, but all chains share ph1.
     cN : int
         The number of chains in the ideal parametric backbone.
     chL : int
         The length of each chain (in amino acid residues).
     co : np.array [cN]
-        The indices necessary to sort the chains into clockwise order, 
+        The indices necessary to sort the chains into clockwise order,
         beginning from the first chain.
     cr : np.array [cN - 1]
-        For each chain k (k > 0), its orientation is parallel to the zeroth 
-        chain if cr[k - 1] == 1 and anti-parallel to chain 0 if cr[k - 1] == 0. 
+        For each chain k (k > 0), its orientation is parallel to the zeroth
+        chain if cr[k - 1] == 1 and anti-parallel to chain 0 if cr[k - 1] == 0.
 
     Returns
     -------
@@ -410,16 +409,16 @@ def unpack_params(p, pType, cN, chL, co, cr):
     ph1 : np.array [cN]
         The helical phase angle (in radians) of each chain.
     dph0 : np.array [cN - 1]
-        For each chain k (k > 0), the superhelical phase offset (in radians) 
+        For each chain k (k > 0), the superhelical phase offset (in radians)
         of chain k relative to chain 0 will be dph0[k - 1].
     zoff : np.array [cN - 1]
-        For each chain k (k > 0), the Z-offset (in Angstroms) of chain k 
+        For each chain k (k > 0), the Z-offset (in Angstroms) of chain k
         relative to chain 0 will be zoff[k - 1].
     J0 : [5 + 3 * cN - 2 x n_param]
-        Jacobian matrix of derivatives of full Crick parameter set with 
+        Jacobian matrix of derivatives of full Crick parameter set with
         respect to the reduced parameters.`
     """
-    J0 = np.zeros((5 + 3 * cN - 2, len(p))) # Jacobian from reduced parameter 
+    J0 = np.zeros((5 + 3 * cN - 2, len(p))) # Jacobian from reduced parameter
                                             # space to full Crick param space
 
     r0, r1, w0, w1, a = p[:5]
@@ -453,10 +452,10 @@ def unpack_params(p, pType, cN, chL, co, cr):
         if np.all(cr[co[::2]] == 1) and np.all(cr[co[1::2]] == 0):
             start, end = end, end + 1
             dph0 = np.zeros(cN)
-            si = np.argsort(np.argsort(co[cr == 1])) # clockwise order of 
+            si = np.argsort(np.argsort(co[cr == 1])) # clockwise order of
                                                      # parallel chains
             dph0[cr == 1] = -si * 2. * np.pi / np.sum(cr == 1)
-            si = np.argsort(np.argsort(co[cr == 0])) # clockwise order of 
+            si = np.argsort(np.argsort(co[cr == 0])) # clockwise order of
                                                      # anti-parallel chains
             dph0[cr == 0] = p[start] - si * 2. * np.pi / np.sum(cr == 0)
             J0[np.arange(5+2*cN-1,5+3*cN-2)[cr == 0], start] = \
@@ -481,14 +480,14 @@ def unpack_params(p, pType, cN, chL, co, cr):
         J0[5+cN:5+2*cN-1, start:end] = np.ones(cN - 1)
         dph0 = -co * 2. * np.pi / cN
 
-    a = np.abs(a) * np.sign(w0) # make sure pitch angle and frequency 
+    a = np.abs(a) * np.sign(w0) # make sure pitch angle and frequency
                                 # have the same sign
-    
+
     return r0, r1, w0, w1, a, ph1, zoff, dph0, J0
 
 
 def crickSSD(p, M, pType, cN, co, cr, is_fit=True):
-    """Returns the error and its gradient between the coordinate set and the 
+    """Returns the error and its gradient between the coordinate set and the
        ideal backbone given Crick parameters.
 
     Parameters
@@ -496,49 +495,49 @@ def crickSSD(p, M, pType, cN, co, cr, is_fit=True):
     p : np.array [n_params]
         Array of parameter values for which to compute the error.
     M : np.array [n_atoms x 3]
-        Coordinate set relative to which to compute the error of the ideal 
+        Coordinate set relative to which to compute the error of the ideal
         parametric backbone.
     pType : str
-       The parameterization type. All fits include superhelical radius (r0), 
-       helical radius (r1), superhelical frequency (w0), helical frequency 
-       (w1), and pitch angle (a) as global parameters. pType then controls 
-       which of the remaining parameters are local to each chain and which 
+       The parameterization type. All fits include superhelical radius (r0),
+       helical radius (r1), superhelical frequency (w0), helical frequency
+       (w1), and pitch angle (a) as global parameters. pType then controls
+       which of the remaining parameters are local to each chain and which
        are global. Choices are:
-           'GENERAL' -- this is the most general option and means that each 
-           helix gets its own helical phase (ph1), superhelical phase offset 
+           'GENERAL' -- this is the most general option and means that each
+           helix gets its own helical phase (ph1), superhelical phase offset
            (dph0) and Z offset (Zoff), regardless of orientation
-           'SYMMETRIC' -- the most symmetric option. ph1 is still individual 
-           to each chain, but there is only one Zoff denoting the offset 
-           between all parallel and antiparallel chains (i.e. all chains 
-           sharing direction are assumed to have zero offset with respect to 
-           each other). Also, for parallel topologies, dph0 is fixed at 
-           i*2*pi.Nc for the i-th chain (so dph0 is not a parameter). For 
-           strictly alternating topologies (up, down, up, down, ...), one 
-           dph0 parameter is allowed to denote the relative rotation of all 
-           parallel chains with respect to all anti-parallel chains. NOTE: 
-           this requires that chains alternate direction in the order listed 
+           'SYMMETRIC' -- the most symmetric option. ph1 is still individual
+           to each chain, but there is only one Zoff denoting the offset
+           between all parallel and antiparallel chains (i.e. all chains
+           sharing direction are assumed to have zero offset with respect to
+           each other). Also, for parallel topologies, dph0 is fixed at
+           i*2*pi.Nc for the i-th chain (so dph0 is not a parameter). For
+           strictly alternating topologies (up, down, up, down, ...), one
+           dph0 parameter is allowed to denote the relative rotation of all
+           parallel chains with respect to all anti-parallel chains. NOTE:
+           this requires that chains alternate direction in the order listed
            in the input file.
            'ZOFF-SYMM' -- same as GENERAL, but Zoff is treated as in SYMMETRIC.
            'DPH0-SYMM' -- same as GENERAL, but dph0 is treated as in SYMMETRIC.
            'GENERAL-HLXPH' -- same as GENERAL, but all chains share ph1.
            'SYMMETRIC-HLXPH' -- same as SYMMETRIC, but all chains share ph1.
-           'ZOFF-SYMM-HLXPH' -- same as ZOFF-SYMM, but all chains share ph1. 
+           'ZOFF-SYMM-HLXPH' -- same as ZOFF-SYMM, but all chains share ph1.
     cN : int
         The number of chains in the ideal parametric backbone.
     co : np.array [cN]
-        The indices necessary to sort the chains into clockwise order, 
+        The indices necessary to sort the chains into clockwise order,
         beginning from the first chain.
     cr : np.array [cN - 1]
-        For each chain k (k > 0), its orientation is parallel to the zeroth 
+        For each chain k (k > 0), its orientation is parallel to the zeroth
         chain if cr[k - 1] == 1 and anti-parallel to chain 0 if cr[k - 1] == 0.
     is_fit : bool
-        If True, this function is being used within a nonlinear least-squares 
+        If True, this function is being used within a nonlinear least-squares
         fitting routine.
 
     Returns
     -------
     ssd : float
-        Sum squared deviation (error) between the coordinate set the the 
+        Sum squared deviation (error) between the coordinate set the the
         ideal backbone given Crick parameters.
     J : np.array [n_params]
         Gradient of error function with respect to the parameters.
@@ -564,7 +563,7 @@ def crickSSD(p, M, pType, cN, co, cr, is_fit=True):
 
 
 def crickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff):
-    """Compute the coordinates of a Crick-parameterized helical bundle and 
+    """Compute the coordinates of a Crick-parameterized helical bundle and
        their derivatives with respect to the real-valued parameters.
 
     Parameters
@@ -586,23 +585,23 @@ def crickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff):
     ph1 : np.array [cN]
         The helical phase angle (in radians) of each chain.
     cr : np.array [cN - 1]
-        For each chain k (k > 0), its orientation is parallel to the zeroth 
+        For each chain k (k > 0), its orientation is parallel to the zeroth
         chain if cr[k - 1] == 1 and anti-parallel to chain 0 if cr[k - 1] == 0.
     dph0 : np.array [cN - 1]
-        For each chain k (k > 0), the superhelical phase offset (in radians) 
+        For each chain k (k > 0), the superhelical phase offset (in radians)
         of chain k relative to chain 0 will be dph0[k - 1].
     zoff : np.array [cN - 1]
-        For each chain k (k > 0), the Z-offset (in Angstroms) of chain k 
+        For each chain k (k > 0), the Z-offset (in Angstroms) of chain k
         relative to chain 0 will be zoff[k - 1].
-    
+
     Returns
     -------
     xyz : np.array [cN * chL x 3]
         Coordinates of the Crick-parameterized helical bundle.
     J_Crick : np.array [5 + 3 * cN - 2 x cN * chL x 3]
-        Jacobian of the coordinates of the Crick-parameterized helical 
-        bundle with respect to the Crick parameters in the following 
-        order: r0, r1, w0, w1, a, ph1 (cN values), zoff (cN - 1 values), 
+        Jacobian of the coordinates of the Crick-parameterized helical
+        bundle with respect to the Crick parameters in the following
+        order: r0, r1, w0, w1, a, ph1 (cN values), zoff (cN - 1 values),
         dph0 (cN - 1 values).
     """
     t = np.hstack([np.arange(chL)] * cN)
@@ -624,49 +623,49 @@ def crickBB(cN, chL, r0, r1, w0, w1, a, ph1, cr, dph0, zoff):
     cos_0, sin_0, cos_1, sin_1 = np.cos(w0 * t + ph0), np.sin(w0 * t + ph0), \
                                  np.cos(w1 * t + ph1), np.sin(w1 * t + ph1)
     cos_a, sin_a, tan_a = np.cos(a), np.sin(a), np.tan(a)
-    xyz = np.array([r0 * cos_0 + r1 * cos_0 * cos_1 - 
-                    r1 * cos_a * sin_0 * sin_1, 
-                    r0 * sin_0 + r1 * sin_0 * cos_1 + 
-                    r1 * cos_a * cos_0 * sin_1, 
-                    r0 * w0 * t / tan_a - 
+    xyz = np.array([r0 * cos_0 + r1 * cos_0 * cos_1 -
+                    r1 * cos_a * sin_0 * sin_1,
+                    r0 * sin_0 + r1 * sin_0 * cos_1 +
+                    r1 * cos_a * cos_0 * sin_1,
+                    r0 * w0 * t / tan_a -
                     r1 * sin_a * sin_1 + zoff]).T
-    J_x = np.vstack([cos_0, 
-                     cos_0 * cos_1 - cos_a * sin_0 * sin_1, 
-                     -t * (r0 * sin_0 + r1 * sin_0 * cos_1 + 
-                           r1 * cos_a * cos_0 * sin_1) * signs, 
-                     -t * r1 * (cos_0 * sin_1 + cos_a * sin_0 * cos_1) * signs, 
-                     r1 * sin_a * sin_0 * sin_1, 
-                     -r1 * (cos_0 * sin_1 + cos_a * sin_0 * cos_1) * 
-                     masks * signs, 
-                     np.zeros((cN - 1, cN * chL)), 
-                     (-r0 * sin_0 - r1 * sin_0 * cos_1 - 
+    J_x = np.vstack([cos_0,
+                     cos_0 * cos_1 - cos_a * sin_0 * sin_1,
+                     -t * (r0 * sin_0 + r1 * sin_0 * cos_1 +
+                           r1 * cos_a * cos_0 * sin_1) * signs,
+                     -t * r1 * (cos_0 * sin_1 + cos_a * sin_0 * cos_1) * signs,
+                     r1 * sin_a * sin_0 * sin_1,
+                     -r1 * (cos_0 * sin_1 + cos_a * sin_0 * cos_1) *
+                     masks * signs,
+                     np.zeros((cN - 1, cN * chL)),
+                     (-r0 * sin_0 - r1 * sin_0 * cos_1 -
                       r1 * cos_a * cos_0 * sin_1) * masks[1:]])
-    J_y = np.vstack([sin_0, 
-                     sin_0 * cos_1 + cos_a * cos_0 * sin_1, 
-                     t * (r0 * cos_0 + r1 * cos_0 * cos_1 - 
-                          r1 * cos_a * sin_0 * sin_1) * signs, 
-                     -t * r1 * (sin_0 * sin_1 - cos_a * cos_0 * cos_1) * signs, 
-                     -r1 * sin_a * cos_0 * sin_1, 
-                     -r1 * (sin_0 * sin_1 - cos_a * cos_0 * cos_1) * 
-                     masks * signs, 
-                     np.zeros((cN - 1, cN * chL)), 
-                     (r0 * cos_0 + r1 * cos_0 * cos_1 - 
+    J_y = np.vstack([sin_0,
+                     sin_0 * cos_1 + cos_a * cos_0 * sin_1,
+                     t * (r0 * cos_0 + r1 * cos_0 * cos_1 -
+                          r1 * cos_a * sin_0 * sin_1) * signs,
+                     -t * r1 * (sin_0 * sin_1 - cos_a * cos_0 * cos_1) * signs,
+                     -r1 * sin_a * cos_0 * sin_1,
+                     -r1 * (sin_0 * sin_1 - cos_a * cos_0 * cos_1) *
+                     masks * signs,
+                     np.zeros((cN - 1, cN * chL)),
+                     (r0 * cos_0 + r1 * cos_0 * cos_1 -
                       r1 * cos_a * sin_0 * sin_1) * masks[1:]])
-    J_z = np.vstack([w0 * t / tan_a, 
-                     -sin_a * sin_1, 
-                     r0 * t / tan_a * signs, 
-                     -r1 * t * sin_a * cos_1 * signs, 
-                     -r0 * w0 * t / sin_a ** 2 - r1 * cos_a * sin_1, 
-                     -r1 * sin_a * cos_1 * masks * signs, 
-                     masks[1:], 
+    J_z = np.vstack([w0 * t / tan_a,
+                     -sin_a * sin_1,
+                     r0 * t / tan_a * signs,
+                     -r1 * t * sin_a * cos_1 * signs,
+                     -r0 * w0 * t / sin_a ** 2 - r1 * cos_a * sin_1,
+                     -r1 * sin_a * cos_1 * masks * signs,
+                     masks[1:],
                      np.zeros((cN - 1, cN * chL))])
     J_x = J_x.reshape((J_x.shape[0], J_x.shape[1], 1))
     J_y = J_y.reshape((J_y.shape[0], J_y.shape[1], 1))
     J_z = J_z.reshape((J_z.shape[0], J_z.shape[1], 1))
     J_Crick = np.concatenate([J_x, J_y, J_z], axis=2)
     return xyz, J_Crick
-    
-        
+
+
 def crossingAngle(A, B, pap):
     """Compute crossing angle between two helices with coordinates A and B.
 
@@ -677,7 +676,7 @@ def crossingAngle(A, B, pap):
     B : np.array [N x 3]
         Coordinates of alpha carbon atoms in the second helix.
     pap : int
-        Integer flag determining whether the helices are parallel (1) or 
+        Integer flag determining whether the helices are parallel (1) or
         antiparallel (0).
 
     Returns
@@ -687,9 +686,9 @@ def crossingAngle(A, B, pap):
     """
     if A.shape[1] != 3 or B.shape[1] != 3:
         raise ValueError(('Unexpected matrix size: A is [{} x {}], '
-                          'B is [{} x {}]!'.format(A.shape[0], 
-                                                   A.shape[1], 
-                                                   B.shape[0], 
+                          'B is [{} x {}]!'.format(A.shape[0],
+                                                   A.shape[1],
+                                                   B.shape[0],
                                                    B.shape[1])))
     if pap == 0:
         B = B[::-1]
@@ -754,7 +753,7 @@ def dihe(p1, p2, p3, p4):
     px2 /= np.linalg.norm(px2)
 
     x = np.dot(px1, px2)
-    y = np.dot(np.cross(px1, v32 / np.linalg.norm(v32)), px2) 
+    y = np.dot(np.cross(px1, v32 / np.linalg.norm(v32)), px2)
 
     return np.arctan2(y, x)
 
@@ -792,17 +791,17 @@ def ideal_helix(n_residues, rise=1.5, twist=100, radius=2.3, start=0):
 
 
 def kabsch(X, Y):
-    """Rotate and translate X into Y to minimize the SSD between the two, 
-       and find the derivatives of the SSD with respect to the entries of Y. 
-       
-       Implements the SVD method by Kabsch et al. (Acta Crystallogr. 1976, 
-       A32, 922) and the SVD differentiation method by Papadopoulo and 
+    """Rotate and translate X into Y to minimize the SSD between the two,
+       and find the derivatives of the SSD with respect to the entries of Y.
+
+       Implements the SVD method by Kabsch et al. (Acta Crystallogr. 1976,
+       A32, 922) and the SVD differentiation method by Papadopoulo and
        Lourakis (INRIA Sophia Antipolis. 2000, research report no. 3961).
 
     Parameters
     ----------
     X : np.array [N x 3]
-        Array of mobile coordinates to be transformed by a proper rotation 
+        Array of mobile coordinates to be transformed by a proper rotation
         to minimize sum squared displacement (SSD) from Y.
     Y : np.array [N x 3]
         Array of stationary coordinates against which to transform X.
@@ -810,10 +809,10 @@ def kabsch(X, Y):
     Returns
     -------
     R : np.array [3 x 3]
-        Proper rotation matrix required to transform X such that its SSD 
+        Proper rotation matrix required to transform X such that its SSD
         with Y is minimized.
     t : np.array [3]
-        Translation matrix required to transform X such that its SSD with Y 
+        Translation matrix required to transform X such that its SSD with Y
         is minimized.
     ssd : float
         Sum squared displacement after alignment.
@@ -841,7 +840,7 @@ def kabsch(X, Y):
            np.einsum('im,mjkl->ijkl', np.dot(U, D), dVtdH)
     dRdY = np.einsum('km,ijml->ijkl', Xc, dRdH)
     XdRdY = np.einsum('im,mjkl->ijkl', Xc, dRdY)
-    d_ssd_dY = 2. * (np.sum(XRmY * XdRdY, axis=(0, 1)) - XRmY) 
+    d_ssd_dY = 2. * (np.sum(XRmY * XdRdY, axis=(0, 1)) - XRmY)
     return R, t, ssd, d_ssd_dY
 
 
@@ -861,10 +860,10 @@ def populate_omegas(U, S, Vt):
     Returns
     -------
     omega_U : np.array [3 x 3 x 3 x 3]
-        omega_U matrix of matrices as described in Papadopolou and 
+        omega_U matrix of matrices as described in Papadopolou and
         Lourakis (2000).
     omega_Vt : np.array [3 x 3 x 3 x 3]
-        omega_V matrix of matrices as described in Papadopolou and 
+        omega_V matrix of matrices as described in Papadopolou and
         Lourakis (2000), but with the last two dimensions transposed.
     """
     omega_U = np.zeros((3, 3, 3, 3))
@@ -872,9 +871,9 @@ def populate_omegas(U, S, Vt):
     for i in range(3):
         for j in range(3):
             for k, l in [(0, 1), (1, 2), (2, 0)]:
-                system_A = np.array([[S[l], S[k]], 
+                system_A = np.array([[S[l], S[k]],
                                      [S[k], S[l]]])
-                system_b = np.array([[U[i, k] * Vt[l, j]], 
+                system_b = np.array([[U[i, k] * Vt[l, j]],
                                      [-U[i, l] * Vt[k, j]]])
                 if S[k] != S[l]:
                     soln = np.linalg.solve(system_A, system_b)
@@ -893,15 +892,15 @@ def select_coords(structure, selection):
     ----------
     structure : Bio.PDB.Structure
         The structure from the PDB file, upon which to perform the selection.
-    selection : str 
-        If empty, the entire structure from pdbfile will be aligned against. 
-        Otherwise, a selection of residues should be provided such that 
-        discontiguous fragments are separated by colons and a one-letter chain 
-        identifier is provided at the beginning of the each fragment that 
-        begins a new chain. For example, "A7-32:39-64:B7-32:39-64" would 
-        specify residues 7 to 32 (inclusive) and 39 to 64 for both chains A 
+    selection : str
+        If empty, the entire structure from pdbfile will be aligned against.
+        Otherwise, a selection of residues should be provided such that
+        discontiguous fragments are separated by colons and a one-letter chain
+        identifier is provided at the beginning of the each fragment that
+        begins a new chain. For example, "A7-32:39-64:B7-32:39-64" would
+        specify residues 7 to 32 (inclusive) and 39 to 64 for both chains A
         and B of a structure.
-    
+
     Returns
     -------
     ca_coords : np.array [n_atoms x 3]
@@ -911,7 +910,7 @@ def select_coords(structure, selection):
     if fragments[0][0] not in alphabet:
         raise ValueError(('The first fragment in the selection must have '
                           'a chain ID!'))
-    sel_chains_resnums = [] 
+    sel_chains_resnums = []
     current_chain = fragments[0][0]
     for fragment in fragments:
         if fragment[0] == current_chain:
@@ -927,10 +926,10 @@ def select_coords(structure, selection):
             sel_chains_resnums.append((current_chain, i))
     chains_resnums_to_coords = {}
     for a in structure.get_atoms():
-        chain_resnum = (a.get_parent().get_parent().id, 
+        chain_resnum = (a.get_parent().get_parent().id,
                         a.get_parent().id[1])
         if chain_resnum not in chains_resnums_to_coords.keys() \
                 and a.name == 'CA':
             chains_resnums_to_coords[chain_resnum] = a.coord
-    return np.array([chains_resnums_to_coords[chain_resnum] 
+    return np.array([chains_resnums_to_coords[chain_resnum]
                      for chain_resnum in sel_chains_resnums])
